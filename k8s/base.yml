@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: webhook-platform
+  labels:
+    name: webhook-platform
+    environment: production
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webhook-platform-config
+  namespace: webhook-platform
+data:
+  AUTH_SERVICE_URL: "http://auth-service:5001"
+  WEBHOOK_SERVICE_URL: "http://webhook-service:5002"
+  EVENT_SERVICE_URL: "http://event-service:5003"
+  DELIVERY_SERVICE_URL: "http://delivery-service:5004"
+  RETRY_SERVICE_URL: "http://retry-service:5005"
+  DLQ_SERVICE_URL: "http://dlq-service:5006"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:5007"
+  LOGS_SERVICE_URL: "http://logs-service:5008"
+  RATE_LIMIT_SERVICE_URL: "http://rate-limit-service:5009"
+  AUTH_SERVICE_PORT: "5001"
+  WEBHOOK_SERVICE_PORT: "5002"
+  EVENT_SERVICE_PORT: "5003"
+  DELIVERY_SERVICE_PORT: "5004"
+  RETRY_SERVICE_PORT: "5005"
+  DLQ_SERVICE_PORT: "5006"
+  NOTIFICATION_SERVICE_PORT: "5007"
+  LOGS_SERVICE_PORT: "5008"
+  RATE_LIMIT_SERVICE_PORT: "5009"
+  KAFKA_BROKER: "kafka:29092"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  NODE_ENV: "production"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webhook-platform-secrets
+  namespace: webhook-platform
+type: Opaque
+stringData:
+  JWT_SECRET: "supersecretkey"
+  INTERNAL_SECRET: "supersecretinternal"
+  AUTH_POSTGRES_URI: "postgresql://neondb_owner:password@ep-raspy-frog.neon.tech/auth_db?sslmode=require"
+  WEBHOOK_POSTGRES_URI: "postgresql://neondb_owner:password@ep-raspy-frog.neon.tech/webhook_db?sslmode=require"
+  DELIVERY_POSTGRES_URI: "postgresql://neondb_owner:password@ep-raspy-frog.neon.tech/delivery_db?sslmode=require"
+  EVENT_MONGO_URI: "mongodb+srv://shyam10:shyamsingh@cluster0.okbbzib.mongodb.net/event-db"
+  DLQ_MONGO_URI: "mongodb+srv://shyam10:shyamsingh@cluster0.o

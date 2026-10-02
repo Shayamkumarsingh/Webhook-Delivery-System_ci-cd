@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: webhook-platform
+  labels:
+    app: notification-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: your-dockerhub/notification-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5007
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: webhook-platform-config
+                  key: NOTIFICATION_SERVICE_PORT
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: webhook-platform-secrets
+                  key: NOTIFICATION_MONGO_URI
+            - name: KAFKA_BROKER
+              valueFrom:
+                configMapKeyRef:
+                  name: webhook-platform-config
+                  key: KAFKA_BROKER
+            - name: EMAIL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: webhook-platform-secrets
+                  key: EMAIL_HOST
+            - name: EMAIL_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: webhook-platform-secrets
+                  key: EMAIL_PORT
+            - name: EMAIL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: webhook-platform-secrets
+                  key: EMAIL_USER
+            - name: EMAIL_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: webhook-platform-secrets
+                  key: EMAIL_PASS
+            - name: AUTH_SERVICE
+              valueFrom:
+                configMapKeyRef:
+                  name: webhook-platform-config
+                  key: AUTH_SERVICE_URL
+            - name: INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: webhook-platform-secrets
+                  key: INTERNAL_SECRET
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: webhook-platform-config
+                  key: NODE_ENV
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5007
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5007
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: webhook-platform
+  labels:
+    app: notification-service
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - name: http
+      port: 5007
+      targetPort: 5007
+  type: ClusterIP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notification-service-hpa
+  namespace: webhook-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notification-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120

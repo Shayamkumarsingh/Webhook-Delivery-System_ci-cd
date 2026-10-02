@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dlq-service
+  namespace: webhook-platform
+  labels:
+    app: dlq-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dlq-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: dlq-service
+    spec:
+      containers:
+        - name: dlq-service
+          image: your-dockerhub/dlq-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5006
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: webhook-platform-config
+                  key: DLQ_SERVICE_PORT
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: webhook-platform-secrets
+                  key: DLQ_MONGO_URI
+            - name: KAFKA_BROKER
+              valueFrom:
+                configMapKeyRef:
+                  name: webhook-platform-config
+                  key: KAFKA_BROKER
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: webhook-platform-config
+                  key: NODE_ENV
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5006
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5006
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dlq-service
+  namespace: webhook-platform
+  labels:
+    app: dlq-service
+spec:
+  selector:
+    app: dlq-service
+  ports:
+    - name: http
+      port: 5006
+      targetPort: 5006
+  type: ClusterIP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: dlq-service-hpa
+  namespace: webhook-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: dlq-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120

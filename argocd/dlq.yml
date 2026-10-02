@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dlq-service
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.io
+  labels:
+    app: dlq-service
+    tier: service
+spec:
+  project: webhook-platform
+
+  source:
+    repoURL: https://github.com/your-username/your-repo.git
+    targetRevision: main
+    path: k8s
+    directory:
+      include: "dlq-service.yml"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: webhook-platform
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /spec/minReplicas
+        - /spec/maxReplicas
+
+  revisionHistoryLimit: 10
+
+  info:
+    - name: "Port"
+      value: "5006"
+    - name: "Database"
+      value: "MongoDB Atlas"
+    - name: "Description"
+      value: "Stores permanently failed events, supports manual retry and delete"
